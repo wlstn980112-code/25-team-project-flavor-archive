@@ -286,6 +286,125 @@ async function seedRecipes() {
   }
 }
 
+async function checkRecipes() {
+  console.log('🔍 데이터베이스 레시피 확인 중...')
+  console.log('📡 Supabase URL:', supabaseUrl)
+  
+  try {
+    // 전체 레시피 확인
+    const { data: allRecipes, error: fetchError } = await supabase
+      .from('recipes')
+      .select('id, title, created_at')
+      .order('created_at', { ascending: false })
+    
+    if (fetchError) {
+      console.error('❌ 레시피 조회 실패:', fetchError)
+      console.error('❌ 에러 상세:', JSON.stringify(fetchError, null, 2))
+      throw fetchError
+    }
+    
+    console.log(`\n📊 총 레시피 수: ${allRecipes?.length || 0}개`)
+    
+    if (allRecipes && allRecipes.length > 0) {
+      console.log('\n📋 현재 데이터베이스에 있는 레시피 목록:')
+      allRecipes.forEach((recipe, index) => {
+        console.log(`  ${index + 1}. ${recipe.title} (ID: ${recipe.id})`)
+      })
+    } else {
+      console.log('\n⚠️ 데이터베이스에 레시피가 없습니다.')
+    }
+    
+    return allRecipes || []
+  } catch (error) {
+    console.error('❌ 오류 발생:', error)
+    throw error
+  }
+}
+
+async function deleteSampleRecipes() {
+  console.log('🗑️ 예시 레시피 삭제 시작...')
+  
+  // 아까 말씀하신 예시 레시피 목록
+  const recipeTitlesToDelete = [
+    '프로틴 스무디',
+    '연어 아보카도 덮밥',
+    '퀴노아 치킨 볼',
+    '소고기 덮밥',
+    '스테이크 샐러드',
+    '닭가슴살 현미 도시락',
+    '그릭 요거트 과일 볼',
+    '닭가슴살 샐러드',
+    '퀴노아 채소 볶음밥',
+    '그릭 요거트 파르페',
+    '두부 스테이크',
+  ]
+  
+  console.log('📋 삭제할 레시피 목록:')
+  recipeTitlesToDelete.forEach((title, index) => {
+    console.log(`  ${index + 1}. ${title}`)
+  })
+  
+  try {
+    // 먼저 전체 레시피 확인
+    const allRecipes = await checkRecipes()
+    
+    // 삭제 전 레시피 확인
+    const { data: beforeDelete, error: checkError } = await supabase
+      .from('recipes')
+      .select('id, title')
+      .in('title', recipeTitlesToDelete)
+    
+    if (checkError) {
+      console.error('❌ 레시피 확인 실패:', checkError)
+      throw checkError
+    }
+    
+    console.log(`\n📦 삭제 대상 레시피 수: ${beforeDelete?.length || 0}개`)
+    if (beforeDelete && beforeDelete.length > 0) {
+      console.log('📋 삭제 대상 레시피:')
+      beforeDelete.forEach((recipe) => {
+        console.log(`  - ${recipe.title} (ID: ${recipe.id})`)
+      })
+      
+      // 레시피 삭제
+      const { data: deletedData, error: deleteError } = await supabase
+        .from('recipes')
+        .delete()
+        .in('title', recipeTitlesToDelete)
+        .select()
+      
+      if (deleteError) {
+        console.error('❌ 레시피 삭제 실패:', deleteError)
+        throw deleteError
+      }
+      
+      console.log('\n✅ 레시피 삭제 성공!')
+      console.log(`✅ 삭제된 레시피 수: ${deletedData?.length || 0}개`)
+      if (deletedData && deletedData.length > 0) {
+        console.log('✅ 삭제된 레시피:')
+        deletedData.forEach((recipe) => {
+          console.log(`  - ${recipe.title}`)
+        })
+      }
+      
+      // 최종 레시피 수 확인
+      const { count: finalCount } = await supabase
+        .from('recipes')
+        .select('*', { count: 'exact', head: true })
+      
+      console.log(`\n📊 최종 레시피 수: ${finalCount || 0}개`)
+      console.log('\n✅ 예시 레시피 삭제 완료!')
+    } else {
+      console.log('⚠️ 삭제할 레시피를 찾을 수 없습니다.')
+      console.log('\n💡 현재 데이터베이스에 있는 레시피와 삭제하려는 레시피 제목이 일치하지 않을 수 있습니다.')
+    }
+  } catch (error) {
+    console.error('❌ 오류 발생:', error)
+    process.exit(1)
+  }
+}
+
 // 스크립트 실행
-seedRecipes()
+// seedRecipes() // 레시피 생성 (주석 처리)
+deleteSampleRecipes() // 예시 레시피 삭제
 

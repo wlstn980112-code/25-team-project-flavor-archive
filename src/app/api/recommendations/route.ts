@@ -123,7 +123,9 @@ export async function POST(req: NextRequest) {
     
     const perMealTarget = Math.round(adjustedDailyCalorie / 3)
     const allergies = Array.isArray(profile.allergy) ? profile.allergy : []
-    const diseases = Array.isArray(profile.disease) ? profile.disease : []
+    const diseases = Array.isArray(profile.disease) 
+      ? (profile.disease as string[])
+      : []
     const userInfo = {
       age: profile.age,
       gender: profile.gender,
@@ -205,7 +207,7 @@ export async function POST(req: NextRequest) {
     }
 
     const diseaseRestrictionsText = diseases.length > 0
-      ? diseases.map((d) => {
+      ? diseases.map((d: string) => {
           const diseaseOption = diseaseOptions.find((opt) => opt.value === d)
           const restriction = diseaseRestrictions[d] || ''
           return diseaseOption ? `${diseaseOption.label}: ${restriction}` : ''

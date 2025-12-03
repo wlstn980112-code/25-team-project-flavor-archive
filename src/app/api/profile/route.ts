@@ -123,14 +123,43 @@ export async function POST(req: NextRequest) {
 
     console.log('💾 [PROFILE API POST] 프로필 데이터 저장 시도:', profileData)
 
-    // upsert: 있으면 업데이트, 없으면 생성
-    const { data: profile, error: profileError } = await supabase
+    // 먼저 기존 프로필 확인
+    const { data: existingProfile, error: checkError } = await supabase
       .from('user_profile')
-      .upsert(profileData, {
-        onConflict: 'user_id',
-      })
-      .select()
+      .select('id')
+      .eq('user_id', user.id)
       .single()
+
+    let profile
+    let profileError
+
+    // checkError가 있지만 프로필이 없는 경우(PGRST116)는 정상
+    const hasExistingProfile = existingProfile && !checkError
+
+    if (hasExistingProfile) {
+      // 기존 프로필이 있으면 업데이트
+      console.log('🔄 [PROFILE API POST] 기존 프로필 업데이트:', existingProfile.id)
+      const { data: updatedProfile, error: updateError } = await supabase
+        .from('user_profile')
+        .update(profileData)
+        .eq('user_id', user.id)
+        .select()
+        .single()
+      
+      profile = updatedProfile
+      profileError = updateError
+    } else {
+      // 기존 프로필이 없으면 생성
+      console.log('➕ [PROFILE API POST] 새 프로필 생성')
+      const { data: newProfile, error: insertError } = await supabase
+        .from('user_profile')
+        .insert(profileData)
+        .select()
+        .single()
+      
+      profile = newProfile
+      profileError = insertError
+    }
 
     if (profileError) {
       console.error('❌ [PROFILE API POST] 프로필 저장 실패!')

@@ -27,15 +27,15 @@ export function useRecipes() {
 
       console.log(`✅ Fetched ${dbRecipes?.length || 0} recipes from Supabase`)
 
-      // 2. 식약처 API에서 레시피 가져오기
+      // 2. 식약처 API에서 레시피 가져오기 (최대 500개)
       let foodSafetyRecipes: Recipe[] = []
       try {
         console.log('🏛️ Fetching recipes from 식약처 API...')
         const response = await axios.get('/api/recipes/food-safety', {
           params: {
             start: 1,
-            end: 100,
-            maxRecipes: 100, // 초기에는 100개만 가져오기 (성능 고려)
+            end: 500,
+            maxRecipes: 500, // 최대 500개까지 가져오기
           },
         })
 

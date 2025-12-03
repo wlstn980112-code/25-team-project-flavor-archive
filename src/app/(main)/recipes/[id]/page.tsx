@@ -3,17 +3,48 @@
 import { useRecipe } from '@/hooks/useRecipes'
 import { useParams, useRouter } from 'next/navigation'
 import { Loader2, ArrowLeft, Clock, Users, ChefHat } from 'lucide-react'
-import type { Ingredient, Step } from '@/types/recipe.types'
+import type { Ingredient, Step, Recipe } from '@/types/recipe.types'
+import { useState, useEffect } from 'react'
 
 export default function RecipeDetailPage() {
   const params = useParams()
   const router = useRouter()
   const recipeId = params.id as string
-  const { data: recipe, isLoading, error } = useRecipe(recipeId)
+  const [aiRecipe, setAiRecipe] = useState<Recipe | null>(null)
+  const [aiRecipeLoaded, setAiRecipeLoaded] = useState(false)
+  // AI 또는 테스트 레시피 (sessionStorage에서 로드)
+  const isAiRecipe = recipeId.startsWith('ai-') || recipeId.startsWith('test-')
+  
+  // AI/테스트 레시피인 경우 sessionStorage에서 가져오기
+  useEffect(() => {
+    if (isAiRecipe) {
+      console.log('📖 [Recipe Detail] Loading recipe from sessionStorage:', recipeId)
+      const storedRecipe = sessionStorage.getItem(`recipe-${recipeId}`)
+      if (storedRecipe) {
+        try {
+          const parsed = JSON.parse(storedRecipe)
+          console.log('✅ [Recipe Detail] Recipe loaded from sessionStorage:', parsed)
+          setAiRecipe(parsed)
+        } catch (error) {
+          console.error('❌ [Recipe Detail] Error parsing recipe:', error)
+        }
+      } else {
+        console.error('❌ [Recipe Detail] Recipe not found in sessionStorage')
+      }
+      setAiRecipeLoaded(true)
+    }
+  }, [recipeId, isAiRecipe])
+  
+  // 데이터베이스 레시피는 기존 훅 사용
+  const { data: dbRecipe, isLoading, error } = useRecipe(isAiRecipe ? '' : recipeId)
+  
+  // AI 레시피 또는 DB 레시피 선택
+  const recipe = isAiRecipe ? aiRecipe : dbRecipe
 
-  console.log('📖 Recipe detail page loaded, ID:', recipeId)
+  console.log('📖 Recipe detail page loaded, ID:', recipeId, 'isAI:', isAiRecipe)
 
-  if (isLoading) {
+  // 로딩 상태
+  if ((isAiRecipe && !aiRecipeLoaded) || (!isAiRecipe && isLoading)) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
@@ -21,16 +52,27 @@ export default function RecipeDetailPage() {
     )
   }
 
-  if (error || !recipe) {
-    console.error('❌ Error loading recipe:', error)
+  // 에러 또는 레시피 없음 (로딩이 완료된 후에만 체크)
+  if ((!isAiRecipe && error) || (aiRecipeLoaded && !recipe) || !recipe) {
+    // 실제 에러가 있을 때만 로깅
+    if (!isAiRecipe && error) {
+      console.error('❌ [Recipe Detail] Error loading DB recipe:', error)
+    } else if (isAiRecipe && aiRecipeLoaded && !recipe) {
+      console.error('❌ [Recipe Detail] AI recipe not found in sessionStorage')
+    }
+    
     return (
       <div className="text-center py-12">
-        <p className="text-red-500 mb-4">레시피를 찾을 수 없습니다.</p>
+        <p className="text-red-500 mb-4">
+          {isAiRecipe 
+            ? 'AI 추천 레시피를 찾을 수 없습니다. 추천 페이지로 돌아가주세요.' 
+            : '레시피를 찾을 수 없습니다.'}
+        </p>
         <button
-          onClick={() => router.push('/recipes')}
+          onClick={() => router.push(isAiRecipe ? '/recommendations' : '/recipes')}
           className="text-orange-500 hover:underline"
         >
-          레시피 목록으로 돌아가기
+          {isAiRecipe ? '추천 페이지로' : '레시피 목록으로'} 돌아가기
         </button>
       </div>
     )

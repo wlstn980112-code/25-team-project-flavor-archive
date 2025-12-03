@@ -10,12 +10,15 @@ const isPublicRoute = createRouteMatcher([
 ])
 
 export default clerkMiddleware(async (auth, request) => {
+  console.log('🔐 Middleware 실행:', request.nextUrl.pathname)
+  
   // 공개 라우트가 아니면 인증 필요
   if (!isPublicRoute(request)) {
+    console.log('🔒 보호된 라우트 - 인증 확인')
     await auth.protect()
+  } else {
+    console.log('🌍 공개 라우트 - 인증 불필요')
   }
-  
-  console.log('🔐 Middleware:', request.nextUrl.pathname)
 })
 
 export const config = {

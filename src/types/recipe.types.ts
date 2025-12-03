@@ -6,6 +6,7 @@ export interface Recipe {
   protein: number
   carb: number
   fat: number
+  cooking_time?: number
   tags: string[] | null
   ingredients: Ingredient[]
   steps: Step[]

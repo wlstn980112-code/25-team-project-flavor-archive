@@ -2,7 +2,6 @@
 
 import { useUser as useClerkUser } from '@clerk/nextjs'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase/client'
 import type { UserProfile } from '@/types/user.types'
 
 /**
@@ -14,6 +13,7 @@ export function useUser() {
 
 /**
  * 현재 로그인한 사용자의 프로필 정보를 가져옵니다.
+ * API route를 통해 안전하게 조회합니다.
  */
 export function useUserProfile() {
   const { user } = useClerkUser()
@@ -26,23 +26,31 @@ export function useUserProfile() {
         return null
       }
 
-      console.log('🔍 Fetching user profile for:', user.id)
+      console.log('🔍 Fetching user profile via API for:', user.id)
 
-      const { data, error } = await supabase
-        .from('user_profile')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
+      try {
+        const response = await fetch('/api/profile')
+        
+        if (!response.ok) {
+          console.log('📝 Profile not found or error occurred')
+          return null
+        }
 
-      if (error) {
+        const result = await response.json()
+        
+        if (result.profile) {
+          console.log('✅ User profile fetched successfully')
+          return result.profile as UserProfile
+        }
+
+        return null
+      } catch (error) {
         console.error('❌ Error fetching user profile:', error)
         return null
       }
-
-      console.log('✅ User profile fetched successfully')
-      return data as UserProfile
     },
     enabled: !!user?.id,
+    retry: false, // 프로필이 없을 수 있으므로 재시도하지 않음
   })
 }
 

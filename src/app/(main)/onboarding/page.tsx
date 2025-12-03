@@ -13,20 +13,74 @@ const onboardingSchema = z.object({
   gender: z.enum(['male', 'female', 'other']).optional(),
   goal: z.enum(['lose', 'keep', 'gain']),
   allergy: z.array(z.string()),
+  disease: z.array(z.string()).optional(),
   height: z.number().min(50).max(250).optional(),
   weight: z.number().min(20).max(300).optional(),
 })
 
 type OnboardingFormSchema = z.infer<typeof onboardingSchema>
 
-// 알레르기 옵션
+// 알레르기 옵션 (22가지)
 const allergyOptions = [
+  { value: 'egg', label: '난류' },
   { value: 'milk', label: '우유' },
-  { value: 'nut', label: '견과류' },
-  { value: 'shellfish', label: '갑각류' },
-  { value: 'egg', label: '계란' },
-  { value: 'soy', label: '콩' },
+  { value: 'buckwheat', label: '메밀' },
+  { value: 'peanut', label: '땅콩' },
+  { value: 'soybean', label: '대두' },
   { value: 'wheat', label: '밀' },
+  { value: 'mackerel', label: '고등어' },
+  { value: 'crab', label: '게' },
+  { value: 'shrimp', label: '새우' },
+  { value: 'pork', label: '돼지고기' },
+  { value: 'peach', label: '복숭아' },
+  { value: 'tomato', label: '토마토' },
+  { value: 'sulfite', label: '아황산류' },
+  { value: 'walnut', label: '호두' },
+  { value: 'chicken', label: '닭고기' },
+  { value: 'beef', label: '쇠고기' },
+  { value: 'squid', label: '오징어' },
+  { value: 'shellfish', label: '조개류' },
+  { value: 'pine_nut', label: '잣' },
+  { value: 'almond', label: '아몬드' },
+  { value: 'cashew', label: '캐슈넛' },
+  { value: 'sesame', label: '참깨' },
+]
+
+// 질병 옵션 (카테고리별)
+const diseaseOptions = [
+  // 심혈관/대사 질환
+  { category: 'cardiovascular', value: 'diabetes_type1', label: '당뇨병 (1형)' },
+  { category: 'cardiovascular', value: 'diabetes_type2', label: '당뇨병 (2형)' },
+  { category: 'cardiovascular', value: 'hypertension', label: '고혈압' },
+  { category: 'cardiovascular', value: 'dyslipidemia', label: '이상지질혈증' },
+  { category: 'cardiovascular', value: 'obesity', label: '비만' },
+  
+  // 신장/비뇨기 질환
+  { category: 'kidney', value: 'ckd', label: '만성 신장 질환 (CKD)' },
+  { category: 'kidney', value: 'kidney_stone', label: '신장 결석' },
+  
+  // 소화기 질환
+  { category: 'digestive', value: 'gastritis', label: '위염/위궤양/식도염' },
+  { category: 'digestive', value: 'ibd', label: '염증성 장 질환 (IBD)' },
+  { category: 'digestive', value: 'ibs', label: '과민성 대장 증후군 (IBS)' },
+  { category: 'digestive', value: 'liver_disease', label: '간 질환' },
+  
+  // 면역/대사성 질환
+  { category: 'immune', value: 'gout', label: '통풍' },
+  { category: 'immune', value: 'anemia', label: '빈혈' },
+  { category: 'immune', value: 'osteoporosis', label: '골다공증' },
+  
+  // 특수 생애 주기
+  { category: 'special', value: 'pregnancy', label: '임신 및 수유기' },
+  { category: 'special', value: 'elderly', label: '노인 영양 관리' },
+]
+
+const diseaseCategories = [
+  { id: 'cardiovascular', label: '심혈관/대사 질환' },
+  { id: 'kidney', label: '신장/비뇨기 질환' },
+  { id: 'digestive', label: '소화기 질환' },
+  { id: 'immune', label: '면역/대사성 질환' },
+  { id: 'special', label: '특수 생애 주기' },
 ]
 
 export default function OnboardingPage() {
@@ -45,6 +99,7 @@ export default function OnboardingPage() {
     resolver: zodResolver(onboardingSchema),
     defaultValues: {
       allergy: [],
+      disease: [],
     },
   })
 
@@ -194,6 +249,16 @@ export default function OnboardingPage() {
     setValue('allergy', newAllergies)
   }
 
+  const toggleDisease = (value: string) => {
+    const currentDiseases = watchedFields.disease || []
+    const newDiseases = currentDiseases.includes(value)
+      ? currentDiseases.filter((d) => d !== value)
+      : [...currentDiseases, value]
+    
+    console.log('🏥 질병 업데이트:', { from: currentDiseases, to: newDiseases })
+    setValue('disease', newDiseases)
+  }
+
   // 프로필 확인 중일 때 로딩 표시
   if (isCheckingProfile) {
     return (
@@ -311,7 +376,7 @@ export default function OnboardingPage() {
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 알레르기 (다중 선택 가능)
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {allergyOptions.map((option) => (
                   <label
                     key={option.value}
@@ -327,9 +392,50 @@ export default function OnboardingPage() {
                       onChange={() => toggleAllergy(option.value)}
                       className="mr-3 h-4 w-4 text-orange-500 rounded"
                     />
-                    <span className="text-gray-700">{option.label}</span>
+                    <span className="text-gray-700 text-sm">{option.label}</span>
                   </label>
                 ))}
+              </div>
+            </div>
+
+            {/* 질병 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                질병/건강 상태 (다중 선택 가능)
+              </label>
+              <div className="space-y-4">
+                {diseaseCategories.map((category) => {
+                  const categoryDiseases = diseaseOptions.filter(
+                    (d) => d.category === category.id
+                  )
+                  return (
+                    <div key={category.id} className="border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-gray-800 mb-3 text-sm">
+                        {category.label}
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {categoryDiseases.map((option) => (
+                          <label
+                            key={option.value}
+                            className={`flex items-center p-2 border-2 rounded-lg cursor-pointer transition-all ${
+                              watchedFields.disease?.includes(option.value)
+                                ? 'border-orange-500 bg-orange-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={watchedFields.disease?.includes(option.value)}
+                              onChange={() => toggleDisease(option.value)}
+                              className="mr-2 h-4 w-4 text-orange-500 rounded"
+                            />
+                            <span className="text-gray-700 text-sm">{option.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
 

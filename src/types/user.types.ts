@@ -12,6 +12,7 @@ export interface UserProfile {
   gender: 'male' | 'female' | 'other' | null
   goal: 'lose' | 'keep' | 'gain'
   allergy: string[] | null
+  disease: string[] | null
   height: number | null
   weight: number | null
   daily_calorie: number
@@ -23,6 +24,7 @@ export interface OnboardingFormData {
   gender?: 'male' | 'female' | 'other'
   goal: 'lose' | 'keep' | 'gain'
   allergy: string[]
+  disease?: string[]
   height?: number
   weight?: number
 }

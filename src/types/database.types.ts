@@ -55,6 +55,7 @@ export type Database = {
         Row: {
           age: number | null
           allergy: Json | null
+          disease: Json | null
           daily_calorie: number
           gender: string | null
           goal: string
@@ -67,6 +68,7 @@ export type Database = {
         Insert: {
           age?: number | null
           allergy?: Json | null
+          disease?: Json | null
           daily_calorie: number
           gender?: string | null
           goal: string
@@ -79,6 +81,7 @@ export type Database = {
         Update: {
           age?: number | null
           allergy?: Json | null
+          disease?: Json | null
           daily_calorie?: number
           gender?: string | null
           goal?: string

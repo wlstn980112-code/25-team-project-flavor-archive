@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
       gender: gender || null,
       goal,
       allergy: allergy || [],
+      disease: data.disease || [],
       height: height || null,
       weight: weight || null,
       daily_calorie: daily_calorie || 2000,

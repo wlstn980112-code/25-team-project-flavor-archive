@@ -7,6 +7,26 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/ge
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+// 질병 옵션 (AI 프롬프트에서 사용)
+const diseaseOptions = [
+  { value: 'diabetes_type1', label: '당뇨병 (1형)' },
+  { value: 'diabetes_type2', label: '당뇨병 (2형)' },
+  { value: 'hypertension', label: '고혈압' },
+  { value: 'dyslipidemia', label: '이상지질혈증' },
+  { value: 'obesity', label: '비만' },
+  { value: 'ckd', label: '만성 신장 질환 (CKD)' },
+  { value: 'kidney_stone', label: '신장 결석' },
+  { value: 'gastritis', label: '위염/위궤양/식도염' },
+  { value: 'ibd', label: '염증성 장 질환 (IBD)' },
+  { value: 'ibs', label: '과민성 대장 증후군 (IBS)' },
+  { value: 'liver_disease', label: '간 질환' },
+  { value: 'gout', label: '통풍' },
+  { value: 'anemia', label: '빈혈' },
+  { value: 'osteoporosis', label: '골다공증' },
+  { value: 'pregnancy', label: '임신 및 수유기' },
+  { value: 'elderly', label: '노인 영양 관리' },
+]
+
 export async function POST(req: NextRequest) {
   console.log('📥 [RECOMMENDATIONS API] AI 식단 추천 API 호출 시작')
   console.log('📥 [RECOMMENDATIONS API] Request URL:', req.url)
@@ -103,11 +123,13 @@ export async function POST(req: NextRequest) {
     
     const perMealTarget = Math.round(adjustedDailyCalorie / 3)
     const allergies = Array.isArray(profile.allergy) ? profile.allergy : []
+    const diseases = Array.isArray(profile.disease) ? profile.disease : []
     const userInfo = {
       age: profile.age,
       gender: profile.gender,
       goal: profile.goal,
       allergies,
+      diseases,
       daily_calorie: adjustedDailyCalorie,
       original_calorie: profile.daily_calorie,
       per_meal_calorie: perMealTarget,
@@ -162,8 +184,36 @@ export async function POST(req: NextRequest) {
 
     console.log(`🕐 [RECOMMENDATIONS API] 추천 요청 시간: ${dateStr} ${timeStr} (ID: ${requestId})`)
 
+    // 질병별 식이 제한 사항 매핑
+    const diseaseRestrictions: Record<string, string> = {
+      diabetes_type1: '혈당 조절, 탄수화물(특히 단순당) 제한, 식이섬유 증가, 포화지방 제한',
+      diabetes_type2: '혈당 조절, 탄수화물(특히 단순당) 제한, 식이섬유 증가, 포화지방 제한',
+      hypertension: '나트륨(염분) 강력 제한, 칼륨 및 마그네슘 충분히 섭취, 포화지방 제한',
+      dyslipidemia: '콜레스테롤 및 중성지방 조절, 포화지방/트랜스지방/콜레스테롤 제한, 불포화지방산 섭취 증가',
+      obesity: '에너지 섭취 조절, 총 칼로리 제한, 영양소 균형 맞추기',
+      ckd: '신장 기능 보호, 단백질, 칼륨, 인, 나트륨 섭취량 단계별 조절',
+      kidney_stone: '결석 종류에 따라 특정 미네랄 제한, 수분 섭취 증가',
+      gastritis: '위 점막 자극 최소화, 맵고 짠 음식, 산도 높은 음식, 카페인, 알코올 제한',
+      ibd: '증상 완화 및 영양 흡수 보조, 고섬유질, 유제품, 특정 지방 제한',
+      ibs: '증상 유발 식품 피하기, FODMAP 제한 식단 고려',
+      liver_disease: '간 기능 개선 및 합병증 예방, 알코올 강력 제한, 적절한 단백질 및 지방 조절',
+      gout: '요산 수치 조절, 퓨린 함량이 높은 식품(내장, 특정 해산물, 술) 제한',
+      anemia: '철분 섭취 증가, 철분 흡수를 돕는 비타민 C 섭취',
+      osteoporosis: '뼈 건강 유지, 칼슘, 비타민 D 섭취 증가',
+      pregnancy: '필수 영양소(엽산, 철분, 칼슘) 섭취 증가, 수은 함유 어류, 과도한 카페인 제한',
+      elderly: '근육량 유지를 위한 단백질 충분히 섭취, 소화가 잘 되는 식단',
+    }
+
+    const diseaseRestrictionsText = diseases.length > 0
+      ? diseases.map((d) => {
+          const diseaseOption = diseaseOptions.find((opt) => opt.value === d)
+          const restriction = diseaseRestrictions[d] || ''
+          return diseaseOption ? `${diseaseOption.label}: ${restriction}` : ''
+        }).filter(Boolean).join('\n- ')
+      : '없음'
+
     const systemPrompt = `당신은 세계적인 영양사이자 요리 전문가입니다.
-사용자의 건강 목표, 알레르기, 하루 목표 칼로리를 고려하여 아침, 점심, 저녁 3끼의 완전히 새로운 레시피를 **직접 생성**해주세요.
+사용자의 건강 목표, 알레르기, 질병/건강 상태, 하루 목표 칼로리를 고려하여 아침, 점심, 저녁 3끼의 완전히 새로운 레시피를 **직접 생성**해주세요.
 
 ⚠️ **칼로리 준수는 절대적으로 중요합니다!**
 
@@ -172,14 +222,16 @@ export async function POST(req: NextRequest) {
 2. **🔥 칼로리 엄격 준수**: 하루 총 칼로리가 목표 칼로리(${userInfo.daily_calorie}kcal)를 **절대 초과하지 않도록** (±5% 이내)
 3. **한 끼 칼로리**: 약 ${userInfo.per_meal_calorie}kcal 내외 (±15% 허용, 초과 금지)
 4. 알레르기 재료(${userInfo.allergies.length > 0 ? userInfo.allergies.join(', ') : '없음'})는 절대 사용 금지
-5. 목표별 영양소 균형:
+5. 질병/건강 상태에 따른 식이 제한 사항을 반드시 준수:
+${diseases.length > 0 ? `- ${diseaseRestrictionsText}` : '- 없음'}
+6. 목표별 영양소 균형:
    - lose(감량): 고단백(30-40%), 저탄수화물(30-40%), 저지방(20-30%) - **저칼로리 필수**
    - keep(유지): 균형잡힌 영양소 (단백질 25%, 탄수화물 50%, 지방 25%)
    - gain(증량): 고단백(30%), 고탄수화물(50%), 적정 지방(20%)
-6. 다양한 요리 스타일 활용 (한식, 양식, 일식, 중식, 퓨전 등)
-7. 신선하고 계절에 맞는 재료 사용
-8. 실제 조리 가능한 현실적인 레시피
-9. **체중 감량(lose) 목표 시**: 채소 위주, 저칼로리 조리법(찜, 구이, 샐러드), 포만감 높은 재료
+7. 다양한 요리 스타일 활용 (한식, 양식, 일식, 중식, 퓨전 등)
+8. 신선하고 계절에 맞는 재료 사용
+9. 실제 조리 가능한 현실적인 레시피
+10. **체중 감량(lose) 목표 시**: 채소 위주, 저칼로리 조리법(찜, 구이, 샐러드), 포만감 높은 재료
 
 매 요청마다 완전히 다른 독창적인 레시피를 만들어주세요!`
 
@@ -196,6 +248,9 @@ export async function POST(req: NextRequest) {
   userInfo.goal === 'keep' ? '⚖️ 현재 체중 유지' : userInfo.goal
 }
 - 알레르기: ${userInfo.allergies.length > 0 ? userInfo.allergies.join(', ') : '없음'}
+- 질병/건강 상태: ${userInfo.diseases.length > 0 
+  ? userInfo.diseases.map((d) => diseaseOptions.find((opt) => opt.value === d)?.label || d).join(', ')
+  : '없음'}
 - 🎯 하루 목표 칼로리: **${userInfo.daily_calorie}kcal (절대 초과 금지!)**
 - 🍽️ 한 끼 목표 칼로리: **약 ${userInfo.per_meal_calorie}kcal (±15% 허용)**
 ${userInfo.adjustment_note ? `- ℹ️ ${userInfo.adjustment_note}` : ''}

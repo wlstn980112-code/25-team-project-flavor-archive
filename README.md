@@ -32,6 +32,10 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
 # Gemini AI - https://aistudio.google.com/app/apikey
 GEMINI_API_KEY=your_gemini_api_key
+
+# 식약처 API - https://www.data.go.kr/
+NEXT_PUBLIC_MFDS_API_KEY=your_mfds_api_key
+NEXT_PUBLIC_MFDS_BASE_URL=http://openapi.foodsafetykorea.go.kr/api
 ```
 
 #### Clerk 키 발급 방법:
@@ -54,6 +58,15 @@ GEMINI_API_KEY=your_gemini_api_key
 4. 기존 Google Cloud 프로젝트 선택 또는 새로 생성
 5. 생성된 키를 복사 (안전하게 보관!)
 6. 무료 tier 제공 (일일 API 호출 제한 있음)
+
+#### 식약처 API 키 발급 방법:
+
+1. [공공데이터포털](https://www.data.go.kr/)에 접속
+2. 회원가입 및 로그인
+3. "식품의약품안전처_조리식품 레시피 정보" 검색
+4. 활용신청 클릭하여 API 키 발급
+5. 발급받은 키를 복사하여 환경 변수에 추가
+6. `NEXT_PUBLIC_MFDS_BASE_URL`은 기본값 사용 가능 (변경 불필요)
 
 ### 2. 의존성 설치
 
@@ -122,6 +135,12 @@ src/
 - 레시피 마스터 데이터
 - `title`, `thumbnail_url`, `calories`, `protein`, `carb`, `fat`, `tags`, `ingredients`, `steps`
 
+### 식약처 API 통합
+
+- 식약처 API에서 레시피 데이터를 가져와서 Supabase 레시피와 함께 표시
+- 레시피 ID 형식: `food-safety-{RCP_SEQ}` (식약처 API 레시피)
+- 자동으로 영양 정보, 조리 과정, 재료 정보 변환
+
 ## 🤖 AI 식단 추천 시스템
 
 Flavor Archive는 **Google Gemini 1.5 Flash**를 활용한 지능형 식단 추천 시스템을 제공합니다.
@@ -166,6 +185,7 @@ Flavor Archive는 **Google Gemini 1.5 Flash**를 활용한 지능형 식단 추�
 - [x] 샘플 레시피 데이터 생성 스크립트
 - [x] 디버그 페이지
 - [x] 상세 에러 로깅
+- [x] 식약처 API 통합 (레시피 목록 및 상세 페이지)
 
 ### 🚧 개발 예정
 
@@ -283,5 +303,6 @@ https://your-app.vercel.app/debug (배포)
 ---
 
 Made with ❤️ by Flavor Archive Team
-#   2 5 - t e a m - p r o j e c t - f l a v o r - a r c h i v e  
+#   2 5 - t e a m - p r o j e c t - f l a v o r - a r c h i v e 
+ 
  

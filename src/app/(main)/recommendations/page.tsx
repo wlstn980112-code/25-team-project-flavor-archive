@@ -11,6 +11,18 @@ const MEAL_EMOJIS = ['🌅', '☀️', '🌙']
 
 const RECOMMENDATIONS_STORAGE_KEY = 'current-recommendations'
 
+// 오늘 날짜를 YYYY-MM-DD 형식으로 반환하는 함수
+const getTodayDateString = (): string => {
+  const today = new Date()
+  return today.toISOString().split('T')[0] // YYYY-MM-DD 형식
+}
+
+// 저장된 추천이 오늘 날짜인지 확인하는 함수
+const isRecommendationFromToday = (savedDate: string): boolean => {
+  const today = getTodayDateString()
+  return savedDate === today
+}
+
 export default function RecommendationsPage() {
   const router = useRouter()
   const { mutate: getRecommendations, isPending } = useRecommendations()
@@ -27,16 +39,25 @@ export default function RecommendationsPage() {
   const restoreRecommendations = useCallback(() => {
     console.log('🔍 [Recommendations Page] Checking for saved recommendations...')
     
-    // sessionStorage에서 저장된 추천 확인
-    const savedRecommendations = sessionStorage.getItem(RECOMMENDATIONS_STORAGE_KEY)
+    // localStorage에서 저장된 추천 확인
+    const savedRecommendations = localStorage.getItem(RECOMMENDATIONS_STORAGE_KEY)
     
     if (savedRecommendations) {
       try {
         const parsed = JSON.parse(savedRecommendations)
-        console.log('✅ [Recommendations Page] Restored saved recommendations:', parsed)
+        console.log('✅ [Recommendations Page] Found saved recommendations:', parsed)
+        
+        // 날짜 확인: 오늘 날짜가 아니면 만료된 것으로 간주
+        if (!parsed.date || !isRecommendationFromToday(parsed.date)) {
+          console.log('⏰ [Recommendations Page] Saved recommendations expired (not from today)')
+          // 만료된 데이터 삭제
+          localStorage.removeItem(RECOMMENDATIONS_STORAGE_KEY)
+          return false
+        }
         
         // 추천 데이터가 유효한지 확인
         if (parsed.recommendations && Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0) {
+          console.log('✅ [Recommendations Page] Restored saved recommendations from today')
           setRecommendations(parsed.recommendations)
           setTotalCalories(parsed.totalCalories || 0)
           setAiReason(parsed.ai_reason || '')
@@ -46,36 +67,99 @@ export default function RecommendationsPage() {
         }
       } catch (error) {
         console.error('❌ [Recommendations Page] Failed to parse saved recommendations:', error)
+        // 파싱 실패 시 삭제
+        localStorage.removeItem(RECOMMENDATIONS_STORAGE_KEY)
       }
     }
     
     return false
   }, [])
 
+  // 현재 상태를 localStorage에 저장하는 함수
+  const saveCurrentState = useCallback(() => {
+    if (recommendations.length > 0) {
+      const today = getTodayDateString()
+      console.log('💾 [Recommendations Page] Saving current state to localStorage (date:', today, ')')
+      localStorage.setItem(RECOMMENDATIONS_STORAGE_KEY, JSON.stringify({
+        recommendations,
+        totalCalories,
+        ai_reason: aiReason,
+        date: today, // 오늘 날짜 저장
+        timestamp: Date.now()
+      }))
+    }
+  }, [recommendations, totalCalories, aiReason])
+
+  // 추천받기 함수를 useCallback으로 정의
+  const handleGetRecommendations = useCallback(() => {
+    console.log('🎯 [Recommendations Page] Requesting recommendations...')
+    
+    getRecommendations(undefined, {
+      onSuccess: (data) => {
+        console.log('✅ [Recommendations Page] Recommendations received:', data)
+        setRecommendations(data.recommendations)
+        setTotalCalories(data.totalCalories)
+        setAiReason(data.ai_reason || '')
+        
+        // 전체 추천 데이터를 localStorage에 저장 (페이지 복원용)
+        const today = getTodayDateString()
+        console.log('💾 [Recommendations Page] Saving recommendations to localStorage (date:', today, ')')
+        localStorage.setItem(RECOMMENDATIONS_STORAGE_KEY, JSON.stringify({
+          recommendations: data.recommendations,
+          totalCalories: data.totalCalories,
+          ai_reason: data.ai_reason || '',
+          date: today, // 오늘 날짜 저장
+          timestamp: Date.now()
+        }))
+        
+        // AI가 생성한 개별 레시피를 sessionStorage에 저장 (상세 페이지용)
+        data.recommendations.forEach((recipe) => {
+          if (recipe.id.startsWith('ai-')) {
+            sessionStorage.setItem(`recipe-${recipe.id}`, JSON.stringify(recipe))
+            console.log(`💾 Saved recipe: ${recipe.id}`)
+          }
+        })
+      },
+      onError: (error) => {
+        console.error('❌ [Recommendations Page] Error getting recommendations:', error)
+        
+        const errorMessage = error.message || '알 수 없는 오류'
+        
+        // 프로필이 없는 경우 온보딩으로 리다이렉트
+        if (errorMessage.includes('프로필') || errorMessage.includes('온보딩')) {
+          console.log('🔄 [Recommendations Page] 프로필이 없음 - 온보딩으로 리다이렉트')
+          alert('먼저 프로필을 설정해주세요.')
+          router.push('/onboarding')
+          return
+        }
+        
+        // 인증 오류
+        if (errorMessage.includes('로그인')) {
+          console.log('🔄 [Recommendations Page] 인증 필요 - 로그인으로 리다이렉트')
+          alert('로그인이 필요합니다.')
+          router.push('/sign-in')
+          return
+        }
+        
+        // 기타 오류
+        alert(`추천을 가져오는 중 오류가 발생했습니다: ${errorMessage}`)
+      },
+    })
+  }, [getRecommendations, router])
+
   // 초기 로드 시: 저장된 추천이 있으면 복원, 없으면 새로 받기
   useEffect(() => {
+    console.log('🚀 [Recommendations Page] Initial load - checking for saved recommendations...')
     const restored = restoreRecommendations()
     
     // 저장된 추천이 없으면 새로 받기
     if (!restored) {
       console.log('📥 [Recommendations Page] No saved recommendations, fetching new ones...')
       handleGetRecommendations()
+    } else {
+      console.log('✅ [Recommendations Page] Successfully restored saved recommendations')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restoreRecommendations])
-
-  // 현재 상태를 sessionStorage에 저장하는 함수
-  const saveCurrentState = useCallback(() => {
-    if (recommendations.length > 0) {
-      console.log('💾 [Recommendations Page] Saving current state to sessionStorage')
-      sessionStorage.setItem(RECOMMENDATIONS_STORAGE_KEY, JSON.stringify({
-        recommendations,
-        totalCalories,
-        ai_reason: aiReason,
-        timestamp: Date.now()
-      }))
-    }
-  }, [recommendations, totalCalories, aiReason])
+  }, [restoreRecommendations, handleGetRecommendations])
 
   // 페이지가 언마운트되거나 상태가 변경될 때 저장
   useEffect(() => {
@@ -123,60 +207,6 @@ export default function RecommendationsPage() {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
   }, [recommendations.length, restoreRecommendations, saveCurrentState])
-
-  const handleGetRecommendations = () => {
-    console.log('🎯 [Recommendations Page] Requesting recommendations...')
-    
-    getRecommendations(undefined, {
-      onSuccess: (data) => {
-        console.log('✅ [Recommendations Page] Recommendations received:', data)
-        setRecommendations(data.recommendations)
-        setTotalCalories(data.totalCalories)
-        setAiReason(data.ai_reason || '')
-        
-        // 전체 추천 데이터를 sessionStorage에 저장 (페이지 복원용)
-        console.log('💾 [Recommendations Page] Saving recommendations to sessionStorage')
-        sessionStorage.setItem(RECOMMENDATIONS_STORAGE_KEY, JSON.stringify({
-          recommendations: data.recommendations,
-          totalCalories: data.totalCalories,
-          ai_reason: data.ai_reason || '',
-          timestamp: Date.now()
-        }))
-        
-        // AI가 생성한 개별 레시피를 sessionStorage에 저장 (상세 페이지용)
-        data.recommendations.forEach((recipe) => {
-          if (recipe.id.startsWith('ai-')) {
-            sessionStorage.setItem(`recipe-${recipe.id}`, JSON.stringify(recipe))
-            console.log(`💾 Saved recipe: ${recipe.id}`)
-          }
-        })
-      },
-      onError: (error) => {
-        console.error('❌ [Recommendations Page] Error getting recommendations:', error)
-        
-        const errorMessage = error.message || '알 수 없는 오류'
-        
-        // 프로필이 없는 경우 온보딩으로 리다이렉트
-        if (errorMessage.includes('프로필') || errorMessage.includes('온보딩')) {
-          console.log('🔄 [Recommendations Page] 프로필이 없음 - 온보딩으로 리다이렉트')
-          alert('먼저 프로필을 설정해주세요.')
-          router.push('/onboarding')
-          return
-        }
-        
-        // 인증 오류
-        if (errorMessage.includes('로그인')) {
-          console.log('🔄 [Recommendations Page] 인증 필요 - 로그인으로 리다이렉트')
-          alert('로그인이 필요합니다.')
-          router.push('/sign-in')
-          return
-        }
-        
-        // 기타 오류
-        alert(`추천을 가져오는 중 오류가 발생했습니다: ${errorMessage}`)
-      },
-    })
-  }
 
   if (isPending && recommendations.length === 0) {
     return (

@@ -11,6 +11,18 @@ import Link from 'next/link'
 
 const RECOMMENDATIONS_STORAGE_KEY = 'current-recommendations'
 
+// 오늘 날짜를 YYYY-MM-DD 형식으로 반환하는 함수
+const getTodayDateString = (): string => {
+  const today = new Date()
+  return today.toISOString().split('T')[0] // YYYY-MM-DD 형식
+}
+
+// 저장된 추천이 오늘 날짜인지 확인하는 함수
+const isRecommendationFromToday = (savedDate: string): boolean => {
+  const today = getTodayDateString()
+  return savedDate === today
+}
+
 export default function HomePage() {
   const { user, isLoaded } = useUser()
   const { data: profile, isLoading: profileLoading } = useUserProfile()
@@ -38,16 +50,25 @@ export default function HomePage() {
   const restoreRecommendations = useCallback(() => {
     console.log('🔍 [Home Page] Checking for saved recommendations...')
     
-    // sessionStorage에서 저장된 추천 확인
-    const savedRecommendations = sessionStorage.getItem(RECOMMENDATIONS_STORAGE_KEY)
+    // localStorage에서 저장된 추천 확인
+    const savedRecommendations = localStorage.getItem(RECOMMENDATIONS_STORAGE_KEY)
     
     if (savedRecommendations) {
       try {
         const parsed = JSON.parse(savedRecommendations)
-        console.log('✅ [Home Page] Restored saved recommendations:', parsed)
+        console.log('✅ [Home Page] Found saved recommendations:', parsed)
+        
+        // 날짜 확인: 오늘 날짜가 아니면 만료된 것으로 간주
+        if (!parsed.date || !isRecommendationFromToday(parsed.date)) {
+          console.log('⏰ [Home Page] Saved recommendations expired (not from today)')
+          // 만료된 데이터 삭제
+          localStorage.removeItem(RECOMMENDATIONS_STORAGE_KEY)
+          return false
+        }
         
         // 추천 데이터가 유효한지 확인
         if (parsed.recommendations && Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0) {
+          console.log('✅ [Home Page] Restored saved recommendations from today')
           setRecommendations(parsed.recommendations)
           return true
         } else {
@@ -55,18 +76,40 @@ export default function HomePage() {
         }
       } catch (error) {
         console.error('❌ [Home Page] Failed to parse saved recommendations:', error)
+        // 파싱 실패 시 삭제
+        localStorage.removeItem(RECOMMENDATIONS_STORAGE_KEY)
       }
     }
     
     return false
   }, [])
 
-  // 현재 상태를 sessionStorage에 저장하는 함수
+  // 현재 상태를 localStorage에 저장하는 함수
   const saveCurrentState = useCallback(() => {
     if (recommendations && recommendations.length > 0) {
-      console.log('💾 [Home Page] Saving current state to sessionStorage')
-      sessionStorage.setItem(RECOMMENDATIONS_STORAGE_KEY, JSON.stringify({
+      const today = getTodayDateString()
+      console.log('💾 [Home Page] Saving current state to localStorage (date:', today, ')')
+      
+      // localStorage에 저장 (recommendations 페이지와 동일한 형식)
+      const savedData = localStorage.getItem(RECOMMENDATIONS_STORAGE_KEY)
+      let totalCalories = 0
+      let aiReason = ''
+      
+      if (savedData) {
+        try {
+          const parsed = JSON.parse(savedData)
+          totalCalories = parsed.totalCalories || 0
+          aiReason = parsed.ai_reason || ''
+        } catch (e) {
+          // 기존 데이터가 없거나 파싱 실패 시 기본값 사용
+        }
+      }
+      
+      localStorage.setItem(RECOMMENDATIONS_STORAGE_KEY, JSON.stringify({
         recommendations,
+        totalCalories,
+        ai_reason: aiReason,
+        date: today, // 오늘 날짜 저장
         timestamp: Date.now()
       }))
       
@@ -82,9 +125,12 @@ export default function HomePage() {
 
   // 초기 로드 시: 저장된 추천이 있으면 복원
   useEffect(() => {
+    console.log('🚀 [Home Page] Initial load - checking for saved recommendations...')
     const restored = restoreRecommendations()
     if (restored) {
-      console.log('✅ [Home Page] Recommendations restored from sessionStorage')
+      console.log('✅ [Home Page] Recommendations restored from localStorage')
+    } else {
+      console.log('📝 [Home Page] No saved recommendations found')
     }
   }, [restoreRecommendations])
 
@@ -158,12 +204,14 @@ export default function HomePage() {
         console.log('✅ [Home Page] Recommendations received:', data)
         setRecommendations(data.recommendations)
         
-        // 전체 추천 데이터를 sessionStorage에 저장 (페이지 복원용)
-        console.log('💾 [Home Page] Saving recommendations to sessionStorage')
-        sessionStorage.setItem(RECOMMENDATIONS_STORAGE_KEY, JSON.stringify({
+        // 전체 추천 데이터를 localStorage에 저장 (페이지 복원용)
+        const today = getTodayDateString()
+        console.log('💾 [Home Page] Saving recommendations to localStorage (date:', today, ')')
+        localStorage.setItem(RECOMMENDATIONS_STORAGE_KEY, JSON.stringify({
           recommendations: data.recommendations,
           totalCalories: data.totalCalories,
           ai_reason: data.ai_reason || '',
+          date: today, // 오늘 날짜 저장
           timestamp: Date.now()
         }))
         

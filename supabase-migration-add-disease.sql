@@ -12,3 +12,5 @@ WHERE disease IS NULL;
 -- 코멘트 추가
 COMMENT ON COLUMN user_profile.disease IS '질병/건강 상태 정보 (JSONB 배열)';
 
+
+

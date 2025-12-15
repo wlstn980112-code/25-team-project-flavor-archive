@@ -144,10 +144,10 @@ export async function POST(req: NextRequest) {
     console.log('🤖 [RECOMMENDATIONS API] Gemini AI 초기화...')
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.0-flash', // thinking 없는 안정 버전으로 변경
+      model: 'gemini-2.5-flash', // 최신 안정 버전 (2024년 12월)
       generationConfig: {
         temperature: 1.0,
-        maxOutputTokens: 4000,
+        maxOutputTokens: 16384, // Gemini 2.5 Flash의 최대 출력 토큰 수
         responseMimeType: 'application/json',
       },
       safetySettings: [
@@ -171,7 +171,7 @@ export async function POST(req: NextRequest) {
     })
 
     console.log('🤖 [RECOMMENDATIONS API] Gemini API 호출 시작...')
-    console.log('🤖 [RECOMMENDATIONS API] 사용 모델: gemini-2.0-flash')
+    console.log('🤖 [RECOMMENDATIONS API] 사용 모델: gemini-2.5-flash')
 
     // 현재 날짜/시간 정보 (매번 다른 추천을 위해)
     const now = new Date()
@@ -235,6 +235,10 @@ ${diseases.length > 0 ? `- ${diseaseRestrictionsText}` : '- 없음'}
 9. 실제 조리 가능한 현실적인 레시피
 10. **체중 감량(lose) 목표 시**: 채소 위주, 저칼로리 조리법(찜, 구이, 샐러드), 포만감 높은 재료
 
+⚠️ **응답 길이 제한**: 토큰 제한으로 인해 각 항목을 간결하게 작성하세요!
+- 재료: 최대 10개
+- 조리 단계: 최대 6개 (각 단계는 간결하게 작성)
+
 매 요청마다 완전히 다른 독창적인 레시피를 만들어주세요!`
 
     const userPrompt = `오늘 날짜: ${dateStr}
@@ -273,6 +277,10 @@ ${userInfo.goal === 'lose' ? `
 
 위 정보를 바탕으로 아침, 점심, 저녁 3개의 완전히 새로운 레시피를 생성하고 다음 JSON 형식으로 응답하세요:
 
+⚠️ **응답 길이 제한**: 토큰 제한이 있으므로 간결하게 작성하세요!
+- 재료: 최대 10개
+- 조리 단계: 최대 6개
+
 {
   "breakfast": {
     "title": "레시피 이름 (한국어)",
@@ -282,11 +290,11 @@ ${userInfo.goal === 'lose' ? `
     "fat": 지방g(숫자),
     "ingredients": [
       {"name": "재료명", "amount": "수량"},
-      ...
+      ...최대 10개
     ],
     "steps": [
       {"step_num": 1, "text": "조리 단계 설명"},
-      ...
+      ...최대 6개
     ],
     "tags": ["태그1", "태그2", "태그3"]
   },
@@ -300,7 +308,8 @@ ${userInfo.goal === 'lose' ? `
 - 매번 완전히 다른 창의적인 레시피를 생성하세요
 - 실제 조리 가능한 구체적인 재료와 단계를 포함하세요
 - **영양소 수치는 정확하게 계산하고 칼로리 목표를 반드시 지키세요**
-- total_calories는 breakfast + lunch + dinner의 합계여야 합니다`
+- total_calories는 breakfast + lunch + dinner의 합계여야 합니다
+- 간결하게 작성하되 품질을 유지하세요`
 
     const prompt = `${systemPrompt}\n\n${userPrompt}`
     
@@ -328,6 +337,23 @@ ${userInfo.goal === 'lose' ? `
       
       if (candidate.finishReason && candidate.finishReason !== 'STOP') {
         console.log('⚠️ [RECOMMENDATIONS API] 비정상 종료:', candidate.finishReason)
+        
+        // MAX_TOKENS 오류 처리
+        if (candidate.finishReason === 'MAX_TOKENS') {
+          console.error('❌ [RECOMMENDATIONS API] 응답이 최대 토큰 수를 초과했습니다')
+          return NextResponse.json(
+            { 
+              error: 'AI 응답이 너무 길어서 잘렸습니다. 다시 시도해주세요.',
+              details: 'Response exceeded maximum token limit',
+              debugInfo: {
+                finishReason: candidate.finishReason,
+                usedTokens: result.response.usageMetadata?.candidatesTokenCount,
+                maxTokens: 16384
+              }
+            },
+            { status: 500 }
+          )
+        }
       }
     }
     

@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { UserButton, useUser } from '@clerk/nextjs'
-import { ChefHat, Home, BookOpen, User, LogIn } from 'lucide-react'
+import { Home, BookOpen, User, LogIn } from 'lucide-react'
 
 export default function Header() {
   const { isSignedIn } = useUser()
@@ -12,11 +13,25 @@ export default function Header() {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* 로고 */}
-          <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition">
-            <ChefHat className="w-8 h-8 text-orange-500" />
-            <span className="text-2xl font-bold text-gray-800">
-              Flavor Archive
-            </span>
+          <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition">
+            <div className="w-10 h-10 relative">
+              <Image 
+                src="/logo.png" 
+                alt="맛카 로고" 
+                fill
+                className="object-contain"
+                priority
+                sizes="40px"
+              />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-2xl font-bold text-orange-500">
+                맛카
+              </span>
+              <span className="text-xs text-gray-500 -mt-1">
+                Flavor Archive
+              </span>
+            </div>
           </Link>
 
           {/* 네비게이션 */}

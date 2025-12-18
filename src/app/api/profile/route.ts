@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const data = await req.json()
     console.log('📦 [PROFILE API POST] 받은 데이터:', data)
 
-    const { age, gender, goal, allergy, height, weight, daily_calorie } = data
+    const { age, gender, goal, activity_level, allergy, height, weight, daily_calorie } = data
 
     // 3. goal 필수 확인
     if (!goal || !['lose', 'keep', 'gain'].includes(goal)) {
@@ -114,6 +114,7 @@ export async function POST(req: NextRequest) {
       age: age || null,
       gender: gender || null,
       goal,
+      activity_level: activity_level || 'moderate',
       allergy: allergy || [],
       disease: data.disease || [],
       height: height || null,

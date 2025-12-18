@@ -12,6 +12,7 @@ const onboardingSchema = z.object({
   age: z.number().min(1).max(120).optional(),
   gender: z.enum(['male', 'female', 'other']).optional(),
   goal: z.enum(['lose', 'keep', 'gain']),
+  activity_level: z.enum(['sedentary', 'light', 'moderate', 'active', 'very_active']),
   allergy: z.array(z.string()),
   disease: z.array(z.string()).optional(),
   height: z.number().min(50).max(250).optional(),
@@ -100,6 +101,7 @@ export default function OnboardingPage() {
     defaultValues: {
       allergy: [],
       disease: [],
+      activity_level: 'moderate',
     },
   })
 
@@ -133,50 +135,61 @@ export default function OnboardingPage() {
 
   const watchedFields = watch()
 
-  // 칼로리 계산 로직
+  // 칼로리 계산 로직 (Mifflin-St Jeor 공식 사용)
   const calculateCalories = (): number => {
     console.log('🧮 칼로리 계산 시작:', watchedFields)
     
-    let baseCalories = 2000
+    let tdee = 2000 // 기본값
 
-    // 목표에 따른 조정
-    if (watchedFields.goal === 'lose') {
-      baseCalories -= 500
-      console.log('📉 감량 목표: -500kcal')
-    } else if (watchedFields.goal === 'gain') {
-      baseCalories += 500
-      console.log('📈 증가 목표: +500kcal')
-    }
-
-    // 키와 몸무게가 있으면 더 정확한 계산 (Harris-Benedict 공식 간소화)
+    // 키, 몸무게, 나이, 성별이 모두 있으면 정확한 계산
     if (watchedFields.height && watchedFields.weight && watchedFields.age && watchedFields.gender) {
       console.log('📊 상세 정보로 정확한 계산 수행')
       
+      // Mifflin-St Jeor 공식으로 BMR 계산
       let bmr: number
       if (watchedFields.gender === 'male') {
-        bmr = 88.362 + (13.397 * watchedFields.weight) + (4.799 * watchedFields.height) - (5.677 * watchedFields.age)
+        // 남성: (10 × 체중kg) + (6.25 × 신장cm) - (5 × 나이) + 5
+        bmr = (10 * watchedFields.weight) + (6.25 * watchedFields.height) - (5 * watchedFields.age) + 5
       } else if (watchedFields.gender === 'female') {
-        bmr = 447.593 + (9.247 * watchedFields.weight) + (3.098 * watchedFields.height) - (4.330 * watchedFields.age)
+        // 여성: (10 × 체중kg) + (6.25 × 신장cm) - (5 × 나이) - 161
+        bmr = (10 * watchedFields.weight) + (6.25 * watchedFields.height) - (5 * watchedFields.age) - 161
       } else {
         bmr = 1800
       }
 
-      // 활동 계수 (보통 활동량)
-      baseCalories = Math.round(bmr * 1.55)
+      // 활동 계수 적용
+      const activityFactors = {
+        sedentary: 1.2,      // 거의 활동 없음
+        light: 1.375,        // 가벼운 활동
+        moderate: 1.55,      // 보통 활동
+        active: 1.725,       // 활동적
+        very_active: 1.9,    // 매우 활동적
+      }
+      
+      const activityFactor = activityFactors[watchedFields.activity_level || 'moderate']
+      tdee = Math.round(bmr * activityFactor)
       
       console.log('💪 기초대사량(BMR):', Math.round(bmr))
-      console.log('🏃 활동 칼로리:', baseCalories)
-
-      // 목표에 따른 조정
-      if (watchedFields.goal === 'lose') {
-        baseCalories -= 500
-      } else if (watchedFields.goal === 'gain') {
-        baseCalories += 500
-      }
+      console.log('🏃 활동 계수:', activityFactor)
+      console.log('⚡ TDEE (총 에너지 소비량):', tdee)
     }
 
-    console.log('✅ 최종 목표 칼로리:', baseCalories)
-    return baseCalories
+    // 목표에 따른 조정 (TDEE 기준)
+    let targetCalories = tdee
+    if (watchedFields.goal === 'lose') {
+      // 체중 감량: TDEE - 500kcal (최소 1200kcal 보장)
+      targetCalories = Math.max(1200, tdee - 500)
+      console.log('📉 감량 목표: TDEE -500kcal =', targetCalories)
+    } else if (watchedFields.goal === 'gain') {
+      // 체중 증량: TDEE + 500kcal
+      targetCalories = tdee + 500
+      console.log('📈 증량 목표: TDEE +500kcal =', targetCalories)
+    } else {
+      console.log('⚖️ 유지 목표: TDEE 유지 =', targetCalories)
+    }
+
+    console.log('✅ 최종 목표 칼로리:', targetCalories)
+    return targetCalories
   }
 
   const onSubmit = async (data: OnboardingFormSchema) => {
@@ -368,6 +381,49 @@ export default function OnboardingPage() {
               </div>
               {errors.goal && (
                 <p className="mt-2 text-sm text-red-600">{errors.goal.message}</p>
+              )}
+            </div>
+
+            {/* 활동 수준 (필수) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                활동 수준 <span className="text-red-500">*</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                일상적인 활동량을 선택해주세요. 정확한 칼로리 계산에 도움이 됩니다.
+              </p>
+              <div className="space-y-2">
+                {[
+                  { value: 'sedentary', label: '거의 활동 없음', desc: '앉아서 생활, 운동 거의 안 함', emoji: '🪑' },
+                  { value: 'light', label: '가벼운 활동', desc: '주 1-3회 가벼운 운동', emoji: '🚶' },
+                  { value: 'moderate', label: '보통 활동', desc: '주 3-5회 보통 강도 운동', emoji: '🏃' },
+                  { value: 'active', label: '활동적', desc: '주 6-7회 격렬한 운동', emoji: '🏋️' },
+                  { value: 'very_active', label: '매우 활동적', desc: '매일 격렬한 운동 2회 이상', emoji: '💪' },
+                ].map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                      watchedFields.activity_level === option.value
+                        ? 'border-orange-500 bg-orange-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      value={option.value}
+                      {...register('activity_level')}
+                      className="sr-only"
+                    />
+                    <span className="text-2xl mr-3">{option.emoji}</span>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-800">{option.label}</div>
+                      <div className="text-xs text-gray-500">{option.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {errors.activity_level && (
+                <p className="mt-2 text-sm text-red-600">{errors.activity_level.message}</p>
               )}
             </div>
 

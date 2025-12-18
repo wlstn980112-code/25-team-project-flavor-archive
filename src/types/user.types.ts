@@ -5,6 +5,8 @@ export interface User {
   created_at: string
 }
 
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
+
 export interface UserProfile {
   id: string
   user_id: string
@@ -15,6 +17,7 @@ export interface UserProfile {
   disease: string[] | null
   height: number | null
   weight: number | null
+  activity_level: ActivityLevel
   daily_calorie: number
   updated_at: string
 }
@@ -27,5 +30,6 @@ export interface OnboardingFormData {
   disease?: string[]
   height?: number
   weight?: number
+  activity_level: ActivityLevel
 }
 

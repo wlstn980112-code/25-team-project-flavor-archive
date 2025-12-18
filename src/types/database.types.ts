@@ -61,6 +61,7 @@ export type Database = {
           goal: string
           height: number | null
           id: string
+          activity_level: string
           updated_at: string
           user_id: string
           weight: number | null
@@ -74,6 +75,7 @@ export type Database = {
           goal: string
           height?: number | null
           id?: string
+          activity_level?: string
           updated_at?: string
           user_id: string
           weight?: number | null
@@ -87,6 +89,7 @@ export type Database = {
           goal?: string
           height?: number | null
           id?: string
+          activity_level?: string
           updated_at?: string
           user_id?: string
           weight?: number | null

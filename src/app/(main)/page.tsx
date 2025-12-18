@@ -249,8 +249,8 @@ export default function HomePage() {
     if (!profile) return 0
     
     if (profile.goal === 'lose') {
-      // 체중 감량: 1800~2000kcal 범위로 조정 (최소 1200kcal)
-      const adjusted = Math.max(1200, Math.min(2000, Math.round(profile.daily_calorie * 0.65)))
+      // 체중 감량: TDEE에서 500kcal 적자 (최소 1200kcal 보장)
+      const adjusted = Math.max(1200, profile.daily_calorie - 500)
       console.log('📉 [Home] 체중 감량 목표 - 칼로리 조정:', profile.daily_calorie, '→', adjusted)
       return adjusted
     } else if (profile.goal === 'gain') {

@@ -110,9 +110,9 @@ export async function POST(req: NextRequest) {
     let calorieAdjustmentNote = ''
     
     if (profile.goal === 'lose') {
-      // 체중 감량: 1800~2000kcal 범위로 조정 (최소 1200kcal)
-      adjustedDailyCalorie = Math.max(1200, Math.min(2000, Math.round(profile.daily_calorie * 0.65)))
-      calorieAdjustmentNote = '체중 감량을 위해 칼로리를 1800~2000kcal 범위로 조정했습니다.'
+      // 체중 감량: TDEE에서 500kcal 적자 (최소 1200kcal 보장)
+      adjustedDailyCalorie = Math.max(1200, profile.daily_calorie - 500)
+      calorieAdjustmentNote = '체중 감량을 위해 하루 500kcal를 줄였습니다. (주당 약 0.5kg 감량 목표)'
       console.log('📉 [RECOMMENDATIONS API] 체중 감량 목표 - 칼로리 조정:', profile.daily_calorie, '→', adjustedDailyCalorie)
     } else if (profile.goal === 'gain') {
       // 체중 증량: 사용자 설정보다 10% 높게

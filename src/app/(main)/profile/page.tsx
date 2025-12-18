@@ -110,6 +110,17 @@ const diseaseCategories = [
   { id: "special", label: "특수 생애 주기" },
 ];
 
+// 상호 배타적인 질병 관계 정의
+const mutuallyExclusiveDiseases: Record<string, string[]> = {
+  // 당뇨병 1형과 2형은 상호 배타적
+  diabetes_type1: ["diabetes_type2"],
+  diabetes_type2: ["diabetes_type1"],
+
+  // 임신/수유기와 노인 영양 관리는 일반적으로 배타적
+  pregnancy: ["elderly"],
+  elderly: ["pregnancy"],
+};
+
 export default function ProfilePage() {
   const router = useRouter();
   const { user } = useUser();
@@ -291,15 +302,42 @@ export default function ProfilePage() {
 
   const toggleDisease = (value: string) => {
     const currentDiseases = watchedFields.disease || [];
-    const newDiseases = currentDiseases.includes(value)
-      ? currentDiseases.filter((d) => d !== value)
-      : [...currentDiseases, value];
 
-    console.log("🏥 [Profile] 질병 업데이트:", {
-      from: currentDiseases,
-      to: newDiseases,
-    });
-    setValue("disease", newDiseases);
+    if (currentDiseases.includes(value)) {
+      // 이미 선택된 경우 -> 제거
+      const newDiseases = currentDiseases.filter((d) => d !== value);
+      console.log("🏥 [Profile] 질병 제거:", {
+        from: currentDiseases,
+        to: newDiseases,
+      });
+      setValue("disease", newDiseases);
+    } else {
+      // 새로 선택하는 경우
+      let newDiseases = [...currentDiseases, value];
+
+      // 상호 배타적인 질병이 있는지 확인
+      const exclusiveList = mutuallyExclusiveDiseases[value];
+      if (exclusiveList && exclusiveList.length > 0) {
+        // 배타적인 질병들을 자동으로 제거
+        const removedDiseases = newDiseases.filter((d) =>
+          exclusiveList.includes(d)
+        );
+        newDiseases = newDiseases.filter((d) => !exclusiveList.includes(d));
+
+        if (removedDiseases.length > 0) {
+          console.log("⚠️ [Profile] 상호 배타적인 질병 자동 제거:", {
+            selected: value,
+            removed: removedDiseases,
+          });
+        }
+      }
+
+      console.log("🏥 [Profile] 질병 추가:", {
+        from: currentDiseases,
+        to: newDiseases,
+      });
+      setValue("disease", newDiseases);
+    }
   };
 
   const handleCancelEdit = () => {
